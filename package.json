@@ -1,5 +1,5 @@
 {
-  "name": "n8n-nodes-handelsregister-ai",
+  "name": "@handelsregister/n8n-nodes-handelsregister-ai",
   "version": "0.1.0",
   "description": "n8n community node for Handelsregister.ai API integration",
   "keywords": [
@@ -31,6 +31,9 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [

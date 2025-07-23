@@ -1,4 +1,4 @@
-# n8n-nodes-handelsregister-ai
+# @handelsregister/n8n-nodes-handelsregister-ai
 
 This is an n8n community node that allows you to interact with the [Handelsregister.ai](https://handelsregister.ai) API to query German business registry data.
 
@@ -8,13 +8,13 @@ This is an n8n community node that allows you to interact with the [Handelsregis
 
 1. In n8n, go to **Settings** > **Community Nodes**
 2. Click **Install**
-3. Enter `n8n-nodes-handelsregister-ai`
+3. Enter `@handelsregister/n8n-nodes-handelsregister-ai`
 4. Click **Install**
 
 ### Manual Installation
 
 ```bash
-npm install n8n-nodes-handelsregister-ai
+npm install @handelsregister/n8n-nodes-handelsregister-ai
 ```
 
 ## Features
@@ -81,7 +81,7 @@ Download official PDF documents from the German business registry:
         "ai_search": true
       },
       "name": "handelsregister.ai",
-      "type": "n8n-nodes-handelsregister-ai.handelsregisterAi",
+      "type": "@handelsregister/n8n-nodes-handelsregister-ai.handelsregisterAi",
       "typeVersion": 1,
       "position": [250, 300]
     }
@@ -103,7 +103,7 @@ Download official PDF documents from the German business registry:
         }
       },
       "name": "Search Organizations",
-      "type": "n8n-nodes-handelsregister-ai.handelsregisterAi",
+      "type": "@handelsregister/n8n-nodes-handelsregister-ai.handelsregisterAi",
       "typeVersion": 1,
       "position": [250, 300]
     }
@@ -122,7 +122,7 @@ Download official PDF documents from the German business registry:
         "document_type": "shareholders_list"
       },
       "name": "Fetch Document",
-      "type": "n8n-nodes-handelsregister-ai.handelsregisterAi",
+      "type": "@handelsregister/n8n-nodes-handelsregister-ai.handelsregisterAi",
       "typeVersion": 1,
       "position": [450, 300]
     }
