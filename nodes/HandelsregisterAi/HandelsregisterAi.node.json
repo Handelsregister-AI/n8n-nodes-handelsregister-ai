@@ -1,0 +1,22 @@
+{
+  "node": "n8n-nodes-base.handelsregisterAi",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Data & Storage"],
+  "resources": {
+    "credentialDocumentation": [
+      {
+        "url": "https://handelsregister.ai/docs/api-authentication"
+      }
+    ],
+    "primaryDocumentation": [
+      {
+        "url": "https://handelsregister.ai/docs"
+      }
+    ]
+  },
+  "subcategories": {
+    "Data & Storage": ["Business Data"]
+  },
+  "alias": ["German Business Registry", "Handelsregister", "Company Search"]
+}

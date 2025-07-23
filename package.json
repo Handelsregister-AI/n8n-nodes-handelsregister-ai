@@ -1,0 +1,59 @@
+{
+  "name": "n8n-nodes-handelsregister-ai",
+  "version": "0.1.0",
+  "description": "n8n community node for Handelsregister.ai API integration",
+  "keywords": [
+    "n8n-community-node-package",
+    "handelsregister",
+    "german-business-registry",
+    "company-data",
+    "unternehmensregister"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/Handelsregister-AI/n8n-nodes-handelsregister-ai",
+  "author": {
+    "name": "Handelsregister AI",
+    "email": "info@handelsregister.ai"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Handelsregister-AI/n8n-nodes-handelsregister-ai.git"
+  },
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc && npm run lint",
+    "dev": "tsc --watch",
+    "format": "prettier nodes credentials --write",
+    "lint": "eslint nodes credentials package.json",
+    "lintfix": "eslint nodes credentials package.json --fix",
+    "prepublishOnly": "npm run build && npm run lint"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/HandelsregisterAiApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/HandelsregisterAi/HandelsregisterAi.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.1",
+    "@typescript-eslint/parser": "^6.13.1",
+    "eslint": "^8.54.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.1",
+    "prettier": "^3.1.0",
+    "typescript": "^5.3.2",
+    "n8n-workflow": "*"
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+}
