@@ -142,6 +142,11 @@ export class HandelsregisterAi implements INodeType {
             value: 'annual_financial_statements',
             description: '5 Credits - Full annual reports in Markdown format',
           },
+          {
+            name: 'Website Content',
+            value: 'website_content',
+            description: '0 Credits - Company website content (requires AI Mode to be enabled)',
+          },
         ],
         default: [],
         description: 'Additional data features to include',

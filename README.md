@@ -43,10 +43,12 @@ Get comprehensive information about a German company:
   - Balance Sheet Accounts (3 Credits)
   - Profit and Loss Account (3 Credits)
   - Related Persons (2 Credits)
+  - Shareholders (5 Credits)
   - Publications (1 Credit)
   - News (10 Credits)
   - Insolvency Publications (1 Credit)
   - Annual Financial Statements (5 Credits)
+  - Website Content (0 Credits - requires AI Mode to be enabled)
 - **AI Mode**: Enable AI-powered search for better results (enabled by default)
 
 ### Search Organizations
