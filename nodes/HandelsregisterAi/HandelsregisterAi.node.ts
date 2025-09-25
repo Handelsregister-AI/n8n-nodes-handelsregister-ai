@@ -343,18 +343,21 @@ export class HandelsregisterAi implements INodeType {
 
           options.url = `${apiUrl}/api/v1/fetch-document`;
 
-          // For document downloads, we need to handle binary data
-          options.returnFullResponse = true;
+          // Configure for binary response
           options.encoding = 'arraybuffer';
+          options.json = false;
+
           const response = await this.helpers.httpRequestWithAuthentication.call(
             this,
             'handelsregisterAiApi',
             options,
           );
 
-          // Return as binary data
+          // Convert arraybuffer to Buffer for prepareBinaryData
+          const buffer = Buffer.from(response);
+
           const binaryData = await this.helpers.prepareBinaryData(
-            Buffer.from(response.body),
+            buffer,
             `${companyId}_${documentType}.pdf`,
             'application/pdf',
           );
