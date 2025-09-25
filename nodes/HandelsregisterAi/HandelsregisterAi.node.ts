@@ -5,7 +5,7 @@ import {
   INodeTypeDescription,
   NodeOperationError,
   NodeConnectionType,
-  IRequestOptions,
+  IHttpRequestOptions,
 } from 'n8n-workflow';
 
 interface SearchResultItem {
@@ -116,6 +116,11 @@ export class HandelsregisterAi implements INodeType {
             name: 'Related Persons',
             value: 'related_persons',
             description: '2 Credits - Current and former directors/executives',
+          },
+          {
+            name: 'Shareholders',
+            value: 'shareholders',
+            description: '5 Credits - Company shareholders information',
           },
           {
             name: 'Publications',
@@ -259,7 +264,6 @@ export class HandelsregisterAi implements INodeType {
     const returnData: INodeExecutionData[] = [];
     const credentials = await this.getCredentials('handelsregisterAiApi');
 
-    const apiKey = credentials.apiKey as string;
     const apiUrl = (credentials.apiUrl as string) || 'https://handelsregister.ai';
 
     for (let i = 0; i < items.length; i++) {
@@ -267,13 +271,11 @@ export class HandelsregisterAi implements INodeType {
         const operation = this.getNodeParameter('operation', i) as string;
         let responseData;
 
-        const options: IRequestOptions = {
+        const options: IHttpRequestOptions = {
           method: 'GET',
-          uri: '',
+          url: '',
           json: true,
-          qs: {
-            api_key: apiKey,
-          },
+          qs: {},
         };
 
         if (operation === 'fetchOrganization') {
@@ -283,7 +285,6 @@ export class HandelsregisterAi implements INodeType {
 
           // Build query parameters manually to handle multiple feature params
           const queryParams = new URLSearchParams();
-          queryParams.append('api_key', apiKey);
           queryParams.append('q', query);
 
           // Add each feature as a separate parameter
@@ -297,10 +298,14 @@ export class HandelsregisterAi implements INodeType {
             queryParams.append('ai_search', 'on-default');
           }
 
-          options.uri = `${apiUrl}/api/v1/fetch-organization?${queryParams.toString()}`;
+          options.url = `${apiUrl}/api/v1/fetch-organization?${queryParams.toString()}`;
           // Remove qs since we're building the query string manually
           delete options.qs;
-          responseData = await this.helpers.request(options);
+          responseData = await this.helpers.httpRequestWithAuthentication.call(
+            this,
+            'handelsregisterAiApi',
+            options,
+          );
         } else if (operation === 'searchOrganizations') {
           const query = this.getNodeParameter('q', i) as string;
           const additionalFields = this.getNodeParameter('additionalFields', i) as {
@@ -322,8 +327,12 @@ export class HandelsregisterAi implements INodeType {
             options.qs.filters = JSON.stringify({ postal_code: additionalFields.postal_code });
           }
 
-          options.uri = `${apiUrl}/api/v1/search-organizations`;
-          responseData = await this.helpers.request(options);
+          options.url = `${apiUrl}/api/v1/search-organizations`;
+          responseData = await this.helpers.httpRequestWithAuthentication.call(
+            this,
+            'handelsregisterAiApi',
+            options,
+          );
         } else if (operation === 'fetchDocument') {
           const companyId = this.getNodeParameter('company_id', i) as string;
           const documentType = this.getNodeParameter('document_type', i) as string;
@@ -332,15 +341,20 @@ export class HandelsregisterAi implements INodeType {
           options.qs.company_id = companyId;
           options.qs.document_type = documentType;
 
-          options.uri = `${apiUrl}/api/v1/fetch-document`;
+          options.url = `${apiUrl}/api/v1/fetch-document`;
 
           // For document downloads, we need to handle binary data
-          options.encoding = null;
-          const response = await this.helpers.request(options);
+          options.returnFullResponse = true;
+          options.encoding = 'arraybuffer';
+          const response = await this.helpers.httpRequestWithAuthentication.call(
+            this,
+            'handelsregisterAiApi',
+            options,
+          );
 
           // Return as binary data
           const binaryData = await this.helpers.prepareBinaryData(
-            Buffer.from(response),
+            Buffer.from(response.body),
             `${companyId}_${documentType}.pdf`,
             'application/pdf',
           );

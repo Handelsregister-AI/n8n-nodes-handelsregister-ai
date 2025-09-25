@@ -1,4 +1,9 @@
-import { ICredentialType, INodeProperties, ICredentialTestRequest } from 'n8n-workflow';
+import {
+  ICredentialType,
+  INodeProperties,
+  ICredentialTestRequest,
+  IAuthenticateGeneric,
+} from 'n8n-workflow';
 
 export class HandelsregisterAiApi implements ICredentialType {
   name = 'handelsregisterAiApi';
@@ -25,13 +30,24 @@ export class HandelsregisterAiApi implements ICredentialType {
     },
   ];
 
+  authenticate: IAuthenticateGeneric = {
+    type: 'generic',
+    properties: {
+      headers: {
+        'x-api-key': '={{$credentials.apiKey}}',
+      },
+    },
+  };
+
   test: ICredentialTestRequest = {
     request: {
       baseURL: '={{$credentials.apiUrl || "https://handelsregister.ai"}}',
       url: '/api/v1/search-organizations',
       method: 'GET',
+      headers: {
+        'x-api-key': '={{$credentials.apiKey}}',
+      },
       qs: {
-        api_key: '={{$credentials.apiKey}}',
         q: 'test',
         limit: 1,
       },
