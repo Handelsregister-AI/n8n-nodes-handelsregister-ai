@@ -370,6 +370,7 @@ export class HandelsregisterAi implements INodeType {
           returnData.push({
             json: { company_id: companyId, document_type: documentType },
             binary: { data: binaryData },
+            pairedItem: { item: i },
           });
           continue;
         }
@@ -387,17 +388,18 @@ export class HandelsregisterAi implements INodeType {
                   credits_remaining: responseData.meta?.credits_remaining,
                 },
               },
+              pairedItem: { item: i },
             })),
           );
         } else if (Array.isArray(responseData)) {
-          returnData.push(...responseData.map((item) => ({ json: item })));
+          returnData.push(...responseData.map((item) => ({ json: item, pairedItem: { item: i } })));
         } else {
-          returnData.push({ json: responseData });
+          returnData.push({ json: responseData, pairedItem: { item: i } });
         }
       } catch (error) {
         if (this.continueOnFail()) {
           const errorMessage = error instanceof Error ? error.message : String(error);
-          returnData.push({ json: { error: errorMessage } });
+          returnData.push({ json: { error: errorMessage }, pairedItem: { item: i } });
           continue;
         }
         throw new NodeOperationError(
