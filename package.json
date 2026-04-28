@@ -1,6 +1,6 @@
 {
   "name": "@handelsregister/n8n-nodes-handelsregister-ai",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "n8n community node for Handelsregister.ai API integration",
   "keywords": [
     "n8n-community-node-package",
@@ -21,7 +21,7 @@
   },
   "main": "index.js",
   "scripts": {
-    "build": "tsc && npm run lint",
+    "build": "tsc && node scripts/copy-assets.js && npm run lint",
     "dev": "tsc --watch",
     "format": "prettier nodes credentials --write",
     "lint": "eslint nodes credentials package.json",

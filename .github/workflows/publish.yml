@@ -1,0 +1,42 @@
+name: Publish to npm
+
+# Triggers:
+# - Push a tag matching v*.*.*  → publishes the package at that tag
+# - Manual run from the Actions tab → publishes whatever is on the chosen branch
+#
+# Requires repository secret `NPM_TOKEN` (an npm Automation token with publish
+# rights on @handelsregister/n8n-nodes-handelsregister-ai). Provenance is
+# generated automatically via the GitHub OIDC token (id-token: write).
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Publish to npm with provenance
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
