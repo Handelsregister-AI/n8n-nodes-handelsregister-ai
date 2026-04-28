@@ -19,9 +19,10 @@ npm install @handelsregister/n8n-nodes-handelsregister-ai
 
 ## Features
 
-- **Fetch Organization**: Get comprehensive information about a German company including financial data, related persons, and publications
+- **Fetch Organization**: Get comprehensive information about a German company including financial data, related persons, shareholders, UBOs, shareholdings, and publications
 - **Search Organizations**: Search German companies with filters and pagination
-- **Fetch Document**: Download official PDF documents from the German business registry
+- **Fetch Document**: Download official PDF documents from the German business registry (Shareholders List, AD, CD, Articles of Association)
+- **Fetch Person**: Look up a person profile by name and company context (with AI enrichment)
 
 ## Setup
 
@@ -49,7 +50,11 @@ Get comprehensive information about a German company:
   - Insolvency Publications (1 Credit)
   - Annual Financial Statements (5 Credits)
   - Website Content (0 Credits - requires AI Mode to be enabled)
+  - UBOs (Ultimate Beneficial Owners)
+  - Shareholdings (outbound holdings the company has in other companies)
+  - Annual Financial Statements (HTML) (HTML variant of the annual reports)
 - **AI Mode**: Enable AI-powered search for better results (enabled by default)
+- **Realtime Mode**: Enable live lookup against the official Handelsregister (+10 credits, disabled by default)
 
 ### Search Organizations
 
@@ -68,6 +73,16 @@ Download official PDF documents from the German business registry:
   - Shareholders List
   - Current Extract (AD)
   - Historical Extract (CD)
+  - Articles of Association (Gesellschaftsvertrag / Satzung)
+
+### Fetch Person
+
+Look up a person profile by name with company context for disambiguation. The endpoint always uses AI enrichment (15 base credits).
+
+- **Person Name**: Full name of the person (minimum 2 characters, e.g., "Erika Mustermann")
+- **Organization**: Company context used to disambiguate common names (minimum 2 characters, e.g., "Musterfirma GmbH")
+- **Features**: Optional additional data
+  - Shareholdings (+5 credits when data is returned)
 
 ## Example Workflows
 
@@ -124,6 +139,26 @@ Download official PDF documents from the German business registry:
         "document_type": "shareholders_list"
       },
       "name": "Fetch Document",
+      "type": "@handelsregister/n8n-nodes-handelsregister-ai.handelsregisterAi",
+      "typeVersion": 1,
+      "position": [450, 300]
+    }
+  ]
+}
+```
+
+### Fetch Person Workflow
+```json
+{
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "fetchPerson",
+        "person_q": "Erika Mustermann",
+        "organization_q": "Musterfirma GmbH",
+        "personFeatures": ["shareholdings"]
+      },
+      "name": "Fetch Person",
       "type": "@handelsregister/n8n-nodes-handelsregister-ai.handelsregisterAi",
       "typeVersion": 1,
       "position": [450, 300]

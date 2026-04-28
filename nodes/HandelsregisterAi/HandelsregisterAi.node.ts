@@ -69,6 +69,13 @@ export class HandelsregisterAi implements INodeType {
             description: 'Download official PDF documents from the German business registry',
             action: 'Fetch document',
           },
+          {
+            name: 'Fetch Person',
+            value: 'fetchPerson',
+            description:
+              'Fetch a person profile by name and company context (always uses AI enrichment)',
+            action: 'Fetch person details',
+          },
         ],
         default: 'fetchOrganization',
       },
@@ -147,6 +154,21 @@ export class HandelsregisterAi implements INodeType {
             value: 'website_content',
             description: '0 Credits - Company website content (requires AI Mode to be enabled)',
           },
+          {
+            name: 'UBOs (Ultimate Beneficial Owners)',
+            value: 'ubos',
+            description: 'Ultimate beneficial owners with ownership percentages',
+          },
+          {
+            name: 'Shareholdings',
+            value: 'shareholdings',
+            description: 'Outbound shareholdings the company holds in other companies',
+          },
+          {
+            name: 'Annual Financial Statements (HTML)',
+            value: 'annual_financial_statements__html',
+            description: 'Full annual reports in HTML format (alternative to the Markdown variant)',
+          },
         ],
         default: [],
         description: 'Additional data features to include',
@@ -162,6 +184,68 @@ export class HandelsregisterAi implements INodeType {
             operation: ['fetchOrganization'],
           },
         },
+      },
+      {
+        displayName: 'Realtime Mode',
+        name: 'realtime_mode',
+        type: 'boolean',
+        default: false,
+        description:
+          'Enable live lookup against the official Handelsregister (+10 credits). Use when the cached data may be stale.',
+        displayOptions: {
+          show: {
+            operation: ['fetchOrganization'],
+          },
+        },
+      },
+      // Fetch Person fields
+      {
+        displayName: 'Person Name',
+        name: 'person_q',
+        type: 'string',
+        default: '',
+        placeholder: 'e.g., Erika Mustermann',
+        description: 'Full name of the person (minimum 2 characters)',
+        displayOptions: {
+          show: {
+            operation: ['fetchPerson'],
+          },
+        },
+        required: true,
+      },
+      {
+        displayName: 'Organization',
+        name: 'organization_q',
+        type: 'string',
+        default: '',
+        placeholder: 'e.g., Musterfirma GmbH',
+        description: 'Company context used to disambiguate common names (minimum 2 characters)',
+        displayOptions: {
+          show: {
+            operation: ['fetchPerson'],
+          },
+        },
+        required: true,
+      },
+      {
+        displayName: 'Features',
+        name: 'personFeatures',
+        type: 'multiOptions',
+        displayOptions: {
+          show: {
+            operation: ['fetchPerson'],
+          },
+        },
+        options: [
+          {
+            name: 'Shareholdings',
+            value: 'shareholdings',
+            description:
+              "Person's shareholdings across companies (+5 credits when data is returned)",
+          },
+        ],
+        default: [],
+        description: 'Optional additional data to include',
       },
       // Search Organizations fields
       {
@@ -252,6 +336,11 @@ export class HandelsregisterAi implements INodeType {
             value: 'CD',
             description: 'Chronological/historical data extract',
           },
+          {
+            name: 'Articles of Association',
+            value: 'articles_of_association',
+            description: 'Gesellschaftsvertrag / Satzung (founding articles / bylaws)',
+          },
         ],
         default: 'shareholders_list',
         displayOptions: {
@@ -301,6 +390,11 @@ export class HandelsregisterAi implements INodeType {
 
           if (aiSearch) {
             queryParams.append('ai_search', 'on-default');
+          }
+
+          const realtimeMode = this.getNodeParameter('realtime_mode', i, false) as boolean;
+          if (realtimeMode) {
+            queryParams.append('realtime_mode', 'handelsregister-default');
           }
 
           options.url = `${apiUrl}/api/v1/fetch-organization?${queryParams.toString()}`;
@@ -373,6 +467,28 @@ export class HandelsregisterAi implements INodeType {
             pairedItem: { item: i },
           });
           continue;
+        } else if (operation === 'fetchPerson') {
+          const personQ = this.getNodeParameter('person_q', i) as string;
+          const organizationQ = this.getNodeParameter('organization_q', i) as string;
+          const personFeatures = this.getNodeParameter('personFeatures', i, []) as string[];
+
+          const queryParams = new URLSearchParams();
+          queryParams.append('person_q', personQ);
+          queryParams.append('organization_q', organizationQ);
+
+          if (personFeatures && personFeatures.length > 0) {
+            personFeatures.forEach((feature) => {
+              queryParams.append('feature', feature);
+            });
+          }
+
+          options.url = `${apiUrl}/api/v1/fetch-person?${queryParams.toString()}`;
+          delete options.qs;
+          responseData = await this.helpers.httpRequestWithAuthentication.call(
+            this,
+            'handelsregisterAiApi',
+            options,
+          );
         }
 
         // Handle different response formats
