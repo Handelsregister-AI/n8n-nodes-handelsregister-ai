@@ -28,16 +28,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Pinned versions:
+      # - Node 22.18.0 — last 22.x line with a working pre-cached npm. Node
+      #   22.22.2 ships with a broken npm 10.9.7 (missing promise-retry).
+      #   See actions/runner-images#13883.
+      # - npm 11.11.0 — first version with the promise-retry fix landed and
+      #   the minimum recommended for Trusted Publishers OIDC publishing
+      #   (TP needs npm >= 11.5.1, but 11.5–11.10 hit the same toolcache bug).
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '22.18.0'
           registry-url: 'https://registry.npmjs.org'
 
-      # Trusted Publishers OIDC publish flow requires npm >= 11.5.1.
-      # Node 22 LTS ships with npm 10.x, so upgrade explicitly.
-      - name: Upgrade npm to latest
-        run: npm install -g npm@latest
+      - name: Pin npm to 11.11.0 (Trusted Publishers OIDC requires >= 11.5.1)
+        run: npm install -g npm@11.11.0
 
       - name: Install dependencies
         run: npm ci
