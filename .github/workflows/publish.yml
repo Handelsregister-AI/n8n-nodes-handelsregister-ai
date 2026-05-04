@@ -28,14 +28,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Do NOT set `registry-url` here. With Trusted Publishers, registry-url
-      # writes an `.npmrc` containing `_authToken=${NODE_AUTH_TOKEN}`, which
-      # resolves to an empty string and pre-empts OIDC auth, causing the
-      # registry PUT to 404 with "auth failed".
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      # Trusted Publishers OIDC publish flow requires npm >= 11.5.1.
+      # Node 22 LTS ships with npm 10.x, so upgrade explicitly.
+      - name: Upgrade npm to latest
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: npm ci
