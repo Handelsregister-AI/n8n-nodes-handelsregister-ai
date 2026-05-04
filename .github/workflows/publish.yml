@@ -4,9 +4,13 @@ name: Publish to npm
 # - Push a tag matching v*.*.*  → publishes the package at that tag
 # - Manual run from the Actions tab → publishes whatever is on the chosen branch
 #
-# Requires repository secret `NPM_TOKEN` (an npm Automation token with publish
-# rights on @handelsregister/n8n-nodes-handelsregister-ai). Provenance is
-# generated automatically via the GitHub OIDC token (id-token: write).
+# Authentication is handled via npm Trusted Publishers (OIDC). No NPM_TOKEN
+# secret is required — npm verifies this workflow directly via the GitHub
+# OIDC token (id-token: write). Provenance is generated automatically.
+#
+# Trusted publisher must be configured at:
+#   https://www.npmjs.com/package/@handelsregister/n8n-nodes-handelsregister-ai/access
+# with workflow filename `publish.yml`.
 
 on:
   push:
@@ -38,5 +42,3 @@ jobs:
 
       - name: Publish to npm with provenance
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
