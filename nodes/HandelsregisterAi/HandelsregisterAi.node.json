@@ -6,12 +6,12 @@
   "resources": {
     "credentialDocumentation": [
       {
-        "url": "https://handelsregister.ai/docs/api-authentication"
+        "url": "https://handelsregister.ai/documentation#authentication"
       }
     ],
     "primaryDocumentation": [
       {
-        "url": "https://handelsregister.ai/docs"
+        "url": "https://handelsregister.ai/documentation"
       }
     ]
   },

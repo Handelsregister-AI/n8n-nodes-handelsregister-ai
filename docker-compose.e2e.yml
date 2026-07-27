@@ -1,0 +1,28 @@
+name: handelsregister-n8n-e2e
+
+services:
+  n8n:
+    build:
+      context: .
+      dockerfile: docker/n8n.Dockerfile
+      args:
+        N8N_VERSION: ${N8N_VERSION:-2.31.7}
+    ports:
+      - '127.0.0.1:${N8N_PORT:-5678}:5678'
+    environment:
+      N8N_COMMUNITY_PACKAGES_ENABLED: 'true'
+      N8N_DIAGNOSTICS_ENABLED: 'false'
+      N8N_ENCRYPTION_KEY: 'handelsregister-n8n-e2e-only'
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: 'true'
+      N8N_PERSONALIZATION_ENABLED: 'false'
+      N8N_RUNNERS_ENABLED: 'false'
+      N8N_SECURE_COOKIE: 'false'
+      N8N_TEMPLATES_ENABLED: 'false'
+      N8N_UNVERIFIED_PACKAGES_ENABLED: 'true'
+      N8N_VERSION_NOTIFICATIONS_ENABLED: 'false'
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:5678/healthz']
+      interval: 2s
+      timeout: 2s
+      retries: 45
+      start_period: 10s

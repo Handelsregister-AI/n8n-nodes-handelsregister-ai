@@ -1,6 +1,9 @@
 node_modules/
 dist/
+coverage/
+.e2e/
 *.log
+*.tgz
 .DS_Store
 *.tsbuildinfo
 .env

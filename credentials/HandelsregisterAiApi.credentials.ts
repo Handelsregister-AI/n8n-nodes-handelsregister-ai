@@ -1,8 +1,8 @@
 import {
+  IAuthenticate,
   ICredentialType,
   INodeProperties,
   ICredentialTestRequest,
-  IAuthenticateGeneric,
 } from 'n8n-workflow';
 
 export class HandelsregisterAiApi implements ICredentialType {
@@ -10,6 +10,23 @@ export class HandelsregisterAiApi implements ICredentialType {
   displayName = 'Handelsregister.ai API';
   documentationUrl = 'https://handelsregister.ai/documentation';
   properties: INodeProperties[] = [
+    {
+      displayName: 'Authentication Method',
+      name: 'authenticationMethod',
+      type: 'options',
+      options: [
+        {
+          name: 'API Key',
+          value: 'apiKey',
+        },
+        {
+          name: 'Bearer Token',
+          value: 'bearerToken',
+        },
+      ],
+      default: 'apiKey',
+      description: 'API keys and Bearer tokens work with every API endpoint',
+    },
     {
       displayName: 'API Key',
       name: 'apiKey',
@@ -20,6 +37,27 @@ export class HandelsregisterAiApi implements ICredentialType {
       default: '',
       required: true,
       description: 'Your Handelsregister.ai API key',
+      displayOptions: {
+        show: {
+          authenticationMethod: ['apiKey'],
+        },
+      },
+    },
+    {
+      displayName: 'Bearer Token',
+      name: 'bearerToken',
+      type: 'string',
+      typeOptions: {
+        password: true,
+      },
+      default: '',
+      required: true,
+      description: 'A Bearer token created through the Handelsregister.ai API',
+      displayOptions: {
+        show: {
+          authenticationMethod: ['bearerToken'],
+        },
+      },
     },
     {
       displayName: 'API URL',
@@ -30,13 +68,18 @@ export class HandelsregisterAiApi implements ICredentialType {
     },
   ];
 
-  authenticate: IAuthenticateGeneric = {
-    type: 'generic',
-    properties: {
-      headers: {
-        'x-api-key': '={{$credentials.apiKey}}',
-      },
-    },
+  authenticate: IAuthenticate = async (credentials, requestOptions) => {
+    const authenticationMethod =
+      (credentials.authenticationMethod as string | undefined) || 'apiKey';
+    requestOptions.headers = requestOptions.headers ?? {};
+
+    if (authenticationMethod === 'bearerToken') {
+      requestOptions.headers.Authorization = `Bearer ${String(credentials.bearerToken || '')}`;
+    } else {
+      requestOptions.headers['x-api-key'] = String(credentials.apiKey || '');
+    }
+
+    return requestOptions;
   };
 
   test: ICredentialTestRequest = {
@@ -44,9 +87,6 @@ export class HandelsregisterAiApi implements ICredentialType {
       baseURL: '={{$credentials.apiUrl || "https://handelsregister.ai"}}',
       url: '/api/v1/search-organizations',
       method: 'GET',
-      headers: {
-        'x-api-key': '={{$credentials.apiKey}}',
-      },
       qs: {
         q: 'test',
         limit: 1,

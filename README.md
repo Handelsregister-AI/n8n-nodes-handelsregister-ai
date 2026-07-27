@@ -1,198 +1,192 @@
 # @handelsregister/n8n-nodes-handelsregister-ai
 
-This is an n8n community node that allows you to interact with the [Handelsregister.ai](https://handelsregister.ai) API to query German business registry data.
+An n8n community node for the [handelsregister.ai](https://handelsregister.ai) API. It provides structured German company, person, financial, ownership, registry-event, M&A, and document data.
 
 ## Installation
 
-### Community Node
+In n8n, open **Settings → Community Nodes**, select **Install**, and enter:
 
-1. In n8n, go to **Settings** > **Community Nodes**
-2. Click **Install**
-3. Enter `@handelsregister/n8n-nodes-handelsregister-ai`
-4. Click **Install**
+```text
+@handelsregister/n8n-nodes-handelsregister-ai
+```
 
-### Manual Installation
+For a manual installation:
 
 ```bash
 npm install @handelsregister/n8n-nodes-handelsregister-ai
 ```
 
-## Features
+## Authentication
 
-- **Fetch Organization**: Get comprehensive information about a German company including financial data, related persons, shareholders, UBOs, shareholdings, and publications
-- **Search Organizations**: Search German companies with filters and pagination
-- **Fetch Document**: Download official PDF documents from the German business registry (Shareholders List, AD, CD, Articles of Association)
-- **Fetch Person**: Look up a person profile by name and company context (with AI enrichment)
+Create a **Handelsregister.ai API** credential in n8n and select one of:
 
-## Setup
+- **API Key** — sends `x-api-key`
+- **Bearer Token** — sends `Authorization: Bearer …`
 
-1. Get your API key from [Handelsregister.ai](https://handelsregister.ai)
-2. In n8n, add credentials:
-   - Go to **Credentials** > **New**
-   - Select **Handelsregister.ai API**
-   - Enter your API key
-   - Save the credentials
+You can obtain an API key from the [handelsregister.ai dashboard](https://handelsregister.ai/dashboard). The API URL defaults to `https://handelsregister.ai` and can be changed for compatible test environments.
 
-## Usage
+## Operations
 
 ### Fetch Organization
 
-Get comprehensive information about a German company:
-- **Query**: Company name, registration number or search query (e.g., "Konux GmbH aus München")
-- **Features**: Select additional data to include:
-  - Financial KPI (1 Credit)
-  - Balance Sheet Accounts (3 Credits)
-  - Profit and Loss Account (3 Credits)
-  - Related Persons (2 Credits)
-  - Shareholders (5 Credits)
-  - Publications (1 Credit)
-  - News (10 Credits)
-  - Insolvency Publications (1 Credit)
-  - Annual Financial Statements (5 Credits)
-  - Website Content (0 Credits - requires AI Mode to be enabled)
-  - UBOs (Ultimate Beneficial Owners)
-  - Shareholdings (outbound holdings the company has in other companies)
-  - Annual Financial Statements (HTML) (HTML variant of the annual reports)
-- **AI Mode**: Enable AI-powered search for better results (enabled by default)
-- **Realtime Mode**: Enable live lookup against the official Handelsregister (+10 credits, disabled by default)
+Fetch an organization by company name, registration number, search query, or `entity_id`.
+
+Base organization data includes the current and historical organization-level `representation_scheme`. Optional features are billed only when they return data, except for the separate AI surcharge.
+
+| Feature                            | Additional credits |
+| ---------------------------------- | -----------------: |
+| Financial KPI                      |                  1 |
+| Balance Sheet Accounts             |                  3 |
+| Profit and Loss Account            |                  3 |
+| Related Persons                    |                  2 |
+| Publications                       |                  1 |
+| News                               |                 10 |
+| Insolvency Publications            |                  5 |
+| Annual Financial Statements        |                  5 |
+| Annual Financial Statements (HTML) |                  5 |
+| Shareholders                       |                  5 |
+| UBOs                               |                 10 |
+| Shareholdings                      |                  5 |
+| Mergers and Acquisitions           |                 20 |
+| Website Content                    |                  0 |
+
+Related-person records include organization- and role-level representation schemes with history. The publications feature is returned under the API response key `history`.
+
+Organization requests have a 5-credit base price. AI Mode adds 20 credits. A successful Realtime Mode lookup adds 10 credits and cannot be combined with Related Persons or Publications.
 
 ### Search Organizations
 
-Search German companies with filters and pagination:
-- **Query**: Search query (minimum 2 characters, e.g., "Konux")
-- **Additional Fields**:
-  - Skip: Number of results to skip
-  - Limit: Results per page (1-100)
-  - Postal Code Filter: Filter by postal code
+Search by a text query, structured filters, or filters alone.
 
-### Fetch Document
+- Each API page contains at most 30 results.
+- **Return All** requests successive pages of 30.
+- **Maximum Results** optionally caps Return All.
+- **Output** can return one n8n item per organization or the complete API response.
+- AI Mode enables AI-assisted search for 5 credits.
 
-Download official PDF documents from the German business registry:
-- **Company ID**: Unique company entity ID from search results
-- **Document Type**: 
-  - Shareholders List
-  - Current Extract (AD)
-  - Historical Extract (CD)
-  - Articles of Association (Gesellschaftsvertrag / Satzung)
+Supported structured filters:
+
+- Registration date from/to
+- Legal-form codes
+- Industry codes and classification scheme
+- Active/inactive status
+- Postal code, city, and state
+- Latitude, longitude, and a 1–100 km radius
+- Register type, authority, and number
+- Company size category
+- Employee-count range
+- Balance-sheet asset, equity, liability, cash, and ratio ranges
+- Revenue, net-income, and EBIT ranges
+
+**Advanced Filters JSON** accepts a raw API filters object for forward compatibility. Explicit structured fields override matching keys in that object.
 
 ### Fetch Person
 
-Look up a person profile by name with company context for disambiguation. The endpoint always uses AI enrichment (15 base credits).
+Fetch a person by name and organization context. The endpoint requires an active Plus, Pro, or Max subscription and has a 15-credit base price.
 
-- **Person Name**: Full name of the person (minimum 2 characters, e.g., "Erika Mustermann")
-- **Organization**: Company context used to disambiguate common names (minimum 2 characters, e.g., "Musterfirma GmbH")
-- **Features**: Optional additional data
-  - Shareholdings (+5 credits when data is returned)
+The optional Shareholdings feature adds 5 credits when data is returned. Person results include current and former organization roles, contact data, ownership data, and organization/role representation schemes.
 
-## Example Workflows
+### Fetch Document
 
-### Fetch Organization with Features
+Download official registry documents into the `data` binary property:
+
+| Type                        | Format |
+| --------------------------- | ------ |
+| Shareholders List           | PDF    |
+| Articles of Association     | PDF    |
+| AD — Current Extract        | PDF    |
+| CD — Historical Extract     | PDF    |
+| SI — Structured Information | XML    |
+
+The node uses the response `Content-Type` and server filename when available.
+
+## Example workflow parameters
+
+Fetch an organization with management and M&A data:
+
 ```json
 {
-  "nodes": [
-    {
-      "parameters": {
-        "operation": "fetchOrganization",
-        "q": "Konux GmbH aus München",
-        "features": ["financial_kpi", "related_persons"],
-        "ai_search": true
-      },
-      "name": "handelsregister.ai",
-      "type": "@handelsregister/n8n-nodes-handelsregister-ai.handelsregisterAi",
-      "typeVersion": 1,
-      "position": [250, 300]
-    }
-  ]
+  "operation": "fetchOrganization",
+  "q": "BMW AG",
+  "features": ["related_persons", "mergers_and_acquisitions"],
+  "ai_search": false,
+  "realtime_mode": false
 }
 ```
 
-### Search Organizations with Filters
+Filter-only organization search:
+
 ```json
 {
-  "nodes": [
-    {
-      "parameters": {
-        "operation": "searchOrganizations",
-        "q": "tech",
-        "additionalFields": {
-          "limit": 20,
-          "postal_code": "80331"
-        }
-      },
-      "name": "Search Organizations",
-      "type": "@handelsregister/n8n-nodes-handelsregister-ai.handelsregisterAi",
-      "typeVersion": 1,
-      "position": [250, 300]
-    }
-  ]
+  "operation": "searchOrganizations",
+  "q": "",
+  "searchAiMode": false,
+  "returnAll": false,
+  "searchOutput": "split",
+  "additionalFields": {
+    "limit": 30,
+    "postal_code": "80331",
+    "legal_form_code": "GmbH, UG",
+    "active": true,
+    "pl_revenue_gte": 1000000
+  }
 }
 ```
 
-### Fetch Document Workflow
+Fetch an SI document:
+
 ```json
 {
-  "nodes": [
-    {
-      "parameters": {
-        "operation": "fetchDocument",
-        "company_id": "{{ $json.entity_id }}",
-        "document_type": "shareholders_list"
-      },
-      "name": "Fetch Document",
-      "type": "@handelsregister/n8n-nodes-handelsregister-ai.handelsregisterAi",
-      "typeVersion": 1,
-      "position": [450, 300]
-    }
-  ]
+  "operation": "fetchDocument",
+  "company_id": "20a1510e88cd2e9b166db4d0bc5d563d",
+  "document_type": "SI"
 }
 ```
 
-### Fetch Person Workflow
-```json
-{
-  "nodes": [
-    {
-      "parameters": {
-        "operation": "fetchPerson",
-        "person_q": "Erika Mustermann",
-        "organization_q": "Musterfirma GmbH",
-        "personFeatures": ["shareholdings"]
-      },
-      "name": "Fetch Person",
-      "type": "@handelsregister/n8n-nodes-handelsregister-ai.handelsregisterAi",
-      "typeVersion": 1,
-      "position": [450, 300]
-    }
-  ]
-}
-```
+## Error handling
 
-### Batch Company Processing
-Use this workflow to process multiple companies from a spreadsheet or database:
+API failures use n8n's API-aware node errors. With **Continue On Fail**, the output contains:
 
-1. **Spreadsheet/Database Node** → Read company names
-2. **handelsregister.ai Node** → Use `searchOrganizations` to find companies
-3. **Filter Node** → Filter results based on criteria
-4. **handelsregister.ai Node** → Use `fetchOrganization` to get detailed data
-5. **Output Node** → Save results to database or file
+- `error`
+- `status_code`, when available
+- machine-readable `code`, when available
+- API `detail`
+- billing and credit `meta`
+
+Credentials and request headers are never included in error output.
+
+HTTP 408 Request Timeout responses are retried transparently up to three times with exponential backoff. Other HTTP failures are returned immediately.
 
 ## Development
 
 ```bash
-# Install dependencies
-npm install
-
-# Build the node
+npm ci
+npm run format:check
+npm run lint
+npm test
 npm run build
-
-# Run in development mode
-npm run dev
+npm audit
+npm pack --dry-run
 ```
+
+The test suite covers request serialization, validation, search pagination, n8n item linking, authentication, documents, and structured errors. Docker end-to-end tests install the generated tarball into a clean n8n instance.
+
+To run the same end-to-end matrix locally:
+
+```bash
+npm run pack:e2e
+npm run docker:e2e:up
+HANDELSREGISTER_API_KEY_THROW_AWAY=your_test_key npm run docker:e2e:test
+npm run docker:e2e:down
+```
+
+The stack binds only to `127.0.0.1:5678`. The live test reads only `HANDELSREGISTER_API_KEY_THROW_AWAY` and exercises the supported company, person, and document operations with API-key authentication. To test a different n8n release, set `N8N_VERSION` for the Docker Compose command.
+
+## Documentation and support
+
+- [API documentation](https://handelsregister.ai/documentation)
+- [GitHub issues](https://github.com/Handelsregister-AI/n8n-nodes-handelsregister-ai/issues)
 
 ## License
 
 [MIT](LICENSE.md)
-
-## Support
-
-For issues and feature requests, please visit the [GitHub repository](https://github.com/Handelsregister-AI/n8n-nodes-handelsregister-ai).

@@ -1,6 +1,6 @@
 {
   "name": "@handelsregister/n8n-nodes-handelsregister-ai",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "n8n community node for Handelsregister.ai API integration",
   "keywords": [
     "n8n-community-node-package",
@@ -17,19 +17,28 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Handelsregister-AI/n8n-nodes-handelsregister-ai.git"
+    "url": "git+https://github.com/Handelsregister-AI/n8n-nodes-handelsregister-ai.git"
   },
   "main": "index.js",
   "scripts": {
     "build": "tsc && node scripts/copy-assets.js && npm run lint",
     "dev": "tsc --watch",
-    "format": "prettier nodes credentials --write",
-    "lint": "eslint nodes credentials package.json",
-    "lintfix": "eslint nodes credentials package.json --fix",
-    "prepublishOnly": "npm run build && npm run lint"
+    "format": "prettier nodes credentials tests scripts .github/workflows README.md CHANGELOG.md package.json docker-compose.e2e.yml vitest.config.ts eslint.config.js tsconfig.json tsconfig.eslint.json --write",
+    "format:check": "prettier nodes credentials tests scripts .github/workflows README.md CHANGELOG.md package.json docker-compose.e2e.yml vitest.config.ts eslint.config.js tsconfig.json tsconfig.eslint.json --check",
+    "lint": "eslint \"nodes/**/*.ts\" \"credentials/**/*.ts\" \"scripts/**/*.js\"",
+    "lintfix": "eslint \"nodes/**/*.ts\" \"credentials/**/*.ts\" \"scripts/**/*.js\" --fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "pack:e2e": "node scripts/prepare-e2e.js",
+    "docker:e2e:up": "docker compose -f docker-compose.e2e.yml up --build --detach",
+    "docker:e2e:down": "docker compose -f docker-compose.e2e.yml down --volumes --remove-orphans",
+    "docker:e2e:test": "node scripts/run-docker-e2e.js",
+    "prepublishOnly": "npm run build && npm test"
   },
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md"
   ],
   "publishConfig": {
     "access": "public"
@@ -44,20 +53,20 @@
     ]
   },
   "devDependencies": {
-    "@types/express": "^4.17.21",
-    "@types/node": "^20.10.0",
-    "@typescript-eslint/eslint-plugin": "^6.13.1",
-    "@typescript-eslint/parser": "^6.13.1",
-    "eslint": "^8.54.0",
-    "eslint-config-prettier": "^9.0.0",
-    "eslint-plugin-prettier": "^5.0.1",
-    "prettier": "^3.1.0",
-    "typescript": "^5.3.2",
-    "n8n-workflow": "*"
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^10.8.0",
+    "globals": "^16.5.0",
+    "n8n-workflow": "2.31.3",
+    "prettier": "^3.9.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^4.1.10"
   },
   "dependencies": {},
   "peerDependencies": {
-    "n8n-workflow": "*"
+    "n8n-workflow": ">=1.82.0 <2 || >=2.31.3 <3"
   },
-  "packageManager": "pnpm@10.17.1+sha512.17c560fca4867ae9473a3899ad84a88334914f379be46d455cbf92e5cf4b39d34985d452d2583baf19967fa76cb5c17bc9e245529d0b98745721aa7200ecaf7a"
+  "packageManager": "npm@11.11.0"
 }

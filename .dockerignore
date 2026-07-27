@@ -1,0 +1,5 @@
+*
+!.e2e/
+!.e2e/handelsregister-node.tgz
+!docker/
+!docker/n8n.Dockerfile

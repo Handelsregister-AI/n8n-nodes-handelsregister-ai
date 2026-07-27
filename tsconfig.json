@@ -14,12 +14,6 @@
     "declaration": true,
     "sourceMap": true
   },
-  "include": [
-    "nodes/**/*",
-    "credentials/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "include": ["nodes/**/*", "credentials/**/*"],
+  "exclude": ["node_modules", "dist"]
 }
