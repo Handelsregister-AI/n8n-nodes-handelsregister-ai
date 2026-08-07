@@ -1,4 +1,9 @@
-import type { IExecuteFunctions, IHttpRequestOptions, INodeExecutionData } from 'n8n-workflow';
+import {
+  type IExecuteFunctions,
+  type IHttpRequestOptions,
+  type INodeExecutionData,
+  NodeConnectionTypes,
+} from 'n8n-workflow';
 import { describe, expect, it, vi } from 'vitest';
 
 import { HandelsregisterAi } from '../nodes/HandelsregisterAi/HandelsregisterAi.node';
@@ -66,22 +71,38 @@ async function execute(context: IExecuteFunctions): Promise<INodeExecutionData[]
 
 describe('HandelsregisterAi node', () => {
   it('exposes supported data operations without administrative token operations', () => {
-    const properties = new HandelsregisterAi().description.properties;
+    const description = new HandelsregisterAi().description;
+    const properties = description.properties;
     const operation = properties.find((property) => property.name === 'operation');
     const features = properties.find((property) => property.name === 'features');
     const documentType = properties.find((property) => property.name === 'document_type');
     const additionalFields = properties.find((property) => property.name === 'additionalFields');
-    const limit = additionalFields?.options?.find((option) => option.name === 'limit');
+    const signalTopics = properties.find((property) => property.name === 'signalTopics');
+    const pageSize = additionalFields?.options?.find((option) => option.name === 'pageSize');
 
+    expect(description.icon).toEqual({
+      light: 'file:../../icons/handelsregister_ai.svg',
+      dark: 'file:../../icons/handelsregister_ai.dark.svg',
+    });
+    expect(description.inputs).toEqual([NodeConnectionTypes.Main]);
+    expect(description.outputs).toEqual([NodeConnectionTypes.Main]);
+    expect(description.subtitle).toBe('={{$parameter["operation"]}}');
+    expect(description.usableAsTool).toBe(true);
     expect(features?.options?.some((option) => option.value === 'mergers_and_acquisitions')).toBe(
       true,
     );
     expect(documentType?.options?.some((option) => option.value === 'SI')).toBe(true);
-    expect(limit?.typeOptions?.maxValue).toBe(30);
+    expect(signalTopics?.options).toHaveLength(7);
+    expect(signalTopics?.options?.some((option) => option.value === 'INSOLVENCIES')).toBe(true);
+    expect(signalTopics?.options?.some((option) => option.value === 'TRANSFORMATIONS')).toBe(true);
+    expect(pageSize?.typeOptions?.maxValue).toBe(30);
     expect(operation?.options?.map((option) => option.value)).toEqual([
       'fetchDocument',
       'fetchOrganization',
       'fetchPerson',
+      'getSignal',
+      'getSignalCatalog',
+      'listSignals',
       'searchOrganizations',
     ]);
   });
@@ -150,7 +171,7 @@ describe('HandelsregisterAi node', () => {
           returnAll: false,
           searchOutput: 'split',
           additionalFields: {
-            limit: 30,
+            pageSize: 30,
             postal_code: '80331',
             legal_form_code: 'GmbH,UG',
           },
@@ -248,6 +269,241 @@ describe('HandelsregisterAi node', () => {
     const results = await execute(context);
     expect(request).toHaveBeenCalledTimes(1);
     expect(results[0].json.results).toHaveLength(5);
+  });
+
+  it('gets the Signal catalog and a URL-encoded Signal detail with item linking', async () => {
+    const { context, request } = createContext(
+      [{ operation: 'getSignalCatalog' }, { operation: 'getSignal', signalId: 'signal/id?value' }],
+      [
+        {
+          topics: [{ code: 'CAPITAL_CHANGES' }],
+          meta: { request_credit_cost: 0 },
+        },
+        {
+          signal: { event: { id: 'signal/id?value', topic: 'CAPITAL_CHANGES' } },
+          meta: { request_credit_cost: 20 },
+        },
+      ],
+    );
+
+    const results = await execute(context);
+    expect(request.mock.calls[0][1].url).toBe('https://api.example.test/api/v1/signals/catalog');
+    expect(request.mock.calls[1][1].url).toBe(
+      'https://api.example.test/api/v1/signals/signal%2Fid%3Fvalue',
+    );
+    expect(results.map((result) => result.pairedItem)).toEqual([{ item: 0 }, { item: 1 }]);
+    expect(results[0].json.topics).toHaveLength(1);
+    expect(results[1].json.signal).toMatchObject({
+      event: { topic: 'CAPITAL_CHANGES' },
+    });
+  });
+
+  it('lists filtered Signals as one n8n item per Signal', async () => {
+    const { context, request } = createContext(
+      [
+        {
+          operation: 'listSignals',
+          signalTopics: ['CAPITAL_CHANGES', 'TRANSFORMATIONS'],
+          signalOrganizationIds: 'org-one, org-two',
+          signalFrom: '2026-07-01',
+          signalTo: '2026-07-30',
+          signalsReturnAll: false,
+          signalCursor: '',
+          signalsOutput: 'split',
+        },
+      ],
+      [
+        {
+          signals: [
+            { event: { id: 'event-one', topic: 'CAPITAL_CHANGES' } },
+            { event: { id: 'event-two', topic: 'TRANSFORMATIONS' } },
+          ],
+          pagination: {
+            mode: 'CURSOR',
+            limit: 20,
+            returned: 2,
+            has_more: false,
+          },
+          filters: { topics: ['CAPITAL_CHANGES', 'TRANSFORMATIONS'] },
+          warnings: [],
+          meta: { request_credit_cost: 20, credits_remaining: 80 },
+        },
+      ],
+    );
+
+    const results = await execute(context);
+    expect(request.mock.calls[0][1]).toMatchObject({
+      method: 'GET',
+      url: 'https://api.example.test/api/v1/signals',
+      qs: {
+        topics: 'CAPITAL_CHANGES,TRANSFORMATIONS',
+        organization_ids: 'org-one,org-two',
+        from: '2026-07-01',
+        to: '2026-07-30',
+      },
+      json: true,
+    });
+    expect(results).toHaveLength(2);
+    expect(results.map((result) => result.json.event)).toEqual([
+      { id: 'event-one', topic: 'CAPITAL_CHANGES' },
+      { id: 'event-two', topic: 'TRANSFORMATIONS' },
+    ]);
+    expect(results[0].json._meta).toEqual({
+      request_credit_cost: 20,
+      credits_remaining: 80,
+      pages_fetched: 1,
+    });
+    expect(results.every((result) => result.pairedItem?.item === 0)).toBe(true);
+  });
+
+  it('follows opaque Signals cursors, aggregates credit cost, and honors Maximum Results', async () => {
+    const firstPage = Array.from({ length: 20 }, (_, index) => ({
+      event: { id: `first-${index}`, topic: 'NEW_REGISTRATIONS' },
+    }));
+    const secondPage = Array.from({ length: 20 }, (_, index) => ({
+      event: { id: `second-${index}`, topic: 'NEW_REGISTRATIONS' },
+    }));
+    const { context, request } = createContext(
+      [
+        {
+          operation: 'listSignals',
+          signalTopics: ['NEW_REGISTRATIONS'],
+          signalOrganizationIds: '',
+          signalFrom: '',
+          signalTo: '',
+          signalsReturnAll: true,
+          signalsMaxResults: 21,
+          signalsOutput: 'response',
+        },
+      ],
+      [
+        {
+          signals: firstPage,
+          pagination: { mode: 'CURSOR', limit: 20, has_more: true, next_cursor: 'opaque' },
+          filters: { topics: ['NEW_REGISTRATIONS'] },
+          warnings: [],
+          meta: { request_credit_cost: 20, credits_remaining: 80 },
+        },
+        {
+          signals: secondPage,
+          pagination: { mode: 'CURSOR', limit: 20, has_more: true, next_cursor: 'next' },
+          filters: { topics: ['NEW_REGISTRATIONS'] },
+          warnings: [],
+          meta: { request_credit_cost: 20, credits_remaining: 60 },
+        },
+      ],
+    );
+
+    const results = await execute(context);
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls[0][1].qs).toEqual({ topics: 'NEW_REGISTRATIONS' });
+    expect(request.mock.calls[1][1].qs).toEqual({
+      topics: 'NEW_REGISTRATIONS',
+      cursor: 'opaque',
+    });
+    expect(results[0].json.signals).toHaveLength(21);
+    expect(results[0].json.pagination).toEqual({
+      mode: 'CURSOR',
+      limit: 20,
+      returned: 21,
+      has_more: false,
+      next_cursor: null,
+      pages_fetched: 2,
+      truncated: true,
+    });
+    expect(results[0].json.meta).toMatchObject({
+      request_credit_cost: 40,
+      credits_remaining: 60,
+    });
+  });
+
+  it('preserves a manual Signals cursor and rejects repeated pagination cursors', async () => {
+    const manual = createContext(
+      [
+        {
+          operation: 'listSignals',
+          signalTopics: [],
+          signalOrganizationIds: '',
+          signalFrom: '',
+          signalTo: '',
+          signalsReturnAll: false,
+          signalCursor: 'manual-cursor',
+          signalsOutput: 'response',
+        },
+      ],
+      [
+        {
+          signals: [],
+          pagination: { mode: 'CURSOR', limit: 20, has_more: false },
+          filters: {},
+          warnings: [],
+          meta: { request_credit_cost: 20 },
+        },
+      ],
+    );
+    const manualResults = await execute(manual.context);
+    expect(manual.request.mock.calls[0][1].qs).toEqual({ cursor: 'manual-cursor' });
+    expect(manualResults[0].json.pagination).toMatchObject({ has_more: false });
+
+    const repeated = createContext(
+      [
+        {
+          operation: 'listSignals',
+          signalTopics: [],
+          signalOrganizationIds: '',
+          signalFrom: '',
+          signalTo: '',
+          signalsReturnAll: true,
+          signalsMaxResults: 0,
+          signalsOutput: 'response',
+        },
+      ],
+      [
+        {
+          signals: [{ event: { id: 'one' } }],
+          pagination: { has_more: true, next_cursor: 'repeated' },
+          meta: { request_credit_cost: 20 },
+        },
+        {
+          signals: [{ event: { id: 'two' } }],
+          pagination: { has_more: true, next_cursor: 'repeated' },
+          meta: { request_credit_cost: 20 },
+        },
+      ],
+    );
+    await expect(execute(repeated.context)).rejects.toThrow(/repeated.*cursor/i);
+  });
+
+  it('returns a structured plan error for restricted Signal topics', async () => {
+    const failure = Object.assign(new Error('Request failed'), {
+      response: {
+        status: 403,
+        data: {
+          error: 'plan_required',
+          meta: { message: 'This Signal topic requires another plan' },
+        },
+      },
+    });
+    const { context } = createContext(
+      [
+        {
+          operation: 'listSignals',
+          signalTopics: ['TRANSFORMATIONS'],
+          signalsReturnAll: false,
+          signalsOutput: 'response',
+        },
+      ],
+      [failure],
+      { continueOnFail: true },
+    );
+
+    const results = await execute(context);
+    expect(results[0].json).toEqual({
+      error: 'plan_required',
+      status_code: 403,
+      code: 'plan_required',
+      meta: { message: 'This Signal topic requires another plan' },
+    });
   });
 
   it('returns SI as XML binary data with the server filename', async () => {

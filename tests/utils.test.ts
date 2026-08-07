@@ -1,18 +1,24 @@
+import { UserError } from 'n8n-workflow';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildOrganizationQuery,
   buildSearchFilters,
   buildSearchRequest,
+  buildSignalsQuery,
   extractApiError,
-  MAX_REQUEST_TIMEOUT_RETRIES,
+  isRetryableRequestError,
+  MAX_RETRY_AFTER_DELAY_MS,
   MAX_SEARCH_PAGE_SIZE,
-  NodeInputError,
+  MAX_TRANSIENT_REQUEST_RETRIES,
   normalizeApiUrl,
   normalizeDocumentResponse,
   parseStringArray,
-  REQUEST_TIMEOUT_RETRY_BASE_DELAY_MS,
-  retryOnRequestTimeout,
+  retryDelayMs,
+  retryTransientRequest,
+  SIGNAL_TOPICS,
+  SIGNALS_PAGE_SIZE,
+  TRANSIENT_RETRY_BASE_DELAY_MS,
   validatePersonQuery,
 } from '../nodes/HandelsregisterAi/utils';
 
@@ -39,7 +45,7 @@ describe('HandelsregisterAi request utilities', () => {
 
   it('rejects unsupported realtime feature combinations', () => {
     expect(() => buildOrganizationQuery('BMW AG', ['related_persons'], false, true)).toThrow(
-      NodeInputError,
+      UserError,
     );
     expect(() => buildOrganizationQuery('BMW AG', ['publications'], false, true)).toThrow(
       /cannot be combined/i,
@@ -52,7 +58,7 @@ describe('HandelsregisterAi request utilities', () => {
       '',
       {
         postal_code: '80331',
-        limit: 30,
+        pageSize: 30,
       },
       true,
     );
@@ -63,6 +69,7 @@ describe('HandelsregisterAi request utilities', () => {
     expect(JSON.parse(String(request.qs.filters))).toEqual({
       postal_code: '80331',
     });
+    expect(buildSearchRequest('tech', { limit: 15 }, false).qs.limit).toBe(15);
   });
 
   it('rejects searches without q or filters and limits above 30', () => {
@@ -113,13 +120,18 @@ describe('HandelsregisterAi request utilities', () => {
       legal_form_code: ['GmbH', 'UG'],
       industry_code: ['62.01', '62.02'],
       active: false,
+      emp_size_category: 'medium',
       location_coordinates: { latitude: 48.137, longitude: 11.575 },
       location_max_distance_km: 25,
-      emp_count: { gte: 50, lte: 249 },
-      bs_assets_total: { gte: 1_000_000 },
-      bs_equity_ratio: { lte: 0.8 },
-      pl_ebit: { gte: 50_000 },
+      financial_filters: {
+        emp_count: { gte: 50, lte: 249 },
+        bs_assets_total: { gte: 1_000_000 },
+        bs_equity_ratio: { lte: 0.8 },
+        pl_ebit: { gte: 50_000 },
+      },
     });
+    expect(filters).not.toHaveProperty('company_size_category');
+    expect(filters).not.toHaveProperty('emp_count');
   });
 
   it('validates coordinates, distances, ranges, and ratios', () => {
@@ -139,6 +151,32 @@ describe('HandelsregisterAi request utilities', () => {
     expect(() => validatePersonQuery('A', 'Company')).toThrow(/person name/i);
     expect(() => validatePersonQuery('Alice', 'C')).toThrow(/organization context/i);
     expect(() => validatePersonQuery('Alice', 'Company')).not.toThrow();
+  });
+
+  it('builds Signals filters with all topics, multiple organizations, dates, and a cursor', () => {
+    expect(SIGNAL_TOPICS).toHaveLength(7);
+    expect(SIGNALS_PAGE_SIZE).toBe(20);
+    expect(
+      buildSignalsQuery({
+        topics: ['CAPITAL_CHANGES', 'TRANSFORMATIONS', 'CAPITAL_CHANGES'],
+        organizationIds: 'org-one, org-two, org-one',
+        fromDate: '2026-07-01',
+        toDate: '2026-07-30T23:59:59Z',
+        cursor: 'opaque-cursor',
+      }),
+    ).toEqual({
+      topics: 'CAPITAL_CHANGES,TRANSFORMATIONS',
+      organization_ids: 'org-one,org-two',
+      from: '2026-07-01',
+      to: '2026-07-30T23:59:59Z',
+      cursor: 'opaque-cursor',
+    });
+  });
+
+  it('rejects unknown Signal topics, invalid dates, and empty cursors', () => {
+    expect(() => buildSignalsQuery({ topics: ['UNKNOWN'] })).toThrow(/unsupported signal/i);
+    expect(() => buildSignalsQuery({ fromDate: 'not-a-date' })).toThrow(/ISO 8601/i);
+    expect(() => buildSignalsQuery({ cursor: ' ' })).toThrow(/cursor/i);
   });
 
   it('normalizes PDF and SI document responses using response headers', () => {
@@ -194,13 +232,13 @@ describe('HandelsregisterAi request utilities', () => {
       .mockResolvedValueOnce({ ok: true });
     const sleep = vi.fn(async () => undefined);
 
-    await expect(retryOnRequestTimeout(request, sleep)).resolves.toEqual({ ok: true });
-    expect(MAX_REQUEST_TIMEOUT_RETRIES).toBe(3);
+    await expect(retryTransientRequest(request, sleep)).resolves.toEqual({ ok: true });
+    expect(MAX_TRANSIENT_REQUEST_RETRIES).toBe(3);
     expect(request).toHaveBeenCalledTimes(4);
     expect(sleep.mock.calls.map(([delay]) => delay)).toEqual([
-      REQUEST_TIMEOUT_RETRY_BASE_DELAY_MS,
-      REQUEST_TIMEOUT_RETRY_BASE_DELAY_MS * 2,
-      REQUEST_TIMEOUT_RETRY_BASE_DELAY_MS * 4,
+      TRANSIENT_RETRY_BASE_DELAY_MS,
+      TRANSIENT_RETRY_BASE_DELAY_MS * 2,
+      TRANSIENT_RETRY_BASE_DELAY_MS * 4,
     ]);
   });
 
@@ -213,22 +251,80 @@ describe('HandelsregisterAi request utilities', () => {
     });
     const sleep = vi.fn(async () => undefined);
 
-    await expect(retryOnRequestTimeout(request, sleep)).rejects.toBe(timeout);
+    await expect(retryTransientRequest(request, sleep)).rejects.toBe(timeout);
     expect(request).toHaveBeenCalledTimes(4);
     expect(sleep).toHaveBeenCalledTimes(3);
   });
 
-  it('does not retry failures other than HTTP 408', async () => {
-    const failure = Object.assign(new Error('Service unavailable'), {
+  it('retries rate limits, server failures, and common network failures', async () => {
+    const rateLimit = Object.assign(new Error('Rate limited'), {
+      response: { status: 429, headers: { 'Retry-After': '0.25' } },
+    });
+    const serviceUnavailable = Object.assign(new Error('Service unavailable'), {
       response: { statusCode: 503 },
     });
-    const request = vi.fn(async () => {
-      throw failure;
+    const networkFailure = Object.assign(new Error('Connection reset'), { code: 'ECONNRESET' });
+    const request = vi
+      .fn<() => Promise<{ ok: boolean }>>()
+      .mockRejectedValueOnce(rateLimit)
+      .mockRejectedValueOnce(serviceUnavailable)
+      .mockRejectedValueOnce(networkFailure)
+      .mockResolvedValueOnce({ ok: true });
+    const sleep = vi.fn(async () => undefined);
+
+    await expect(retryTransientRequest(request, sleep)).resolves.toEqual({ ok: true });
+    expect(request).toHaveBeenCalledTimes(4);
+    expect(sleep.mock.calls.map(([delay]) => delay)).toEqual([
+      250,
+      TRANSIENT_RETRY_BASE_DELAY_MS * 2,
+      TRANSIENT_RETRY_BASE_DELAY_MS * 4,
+    ]);
+  });
+
+  it('parses Retry-After seconds and dates while bounding excessive delays', () => {
+    const now = Date.parse('2026-08-07T12:00:00Z');
+    expect(
+      retryDelayMs(
+        { response: { headers: { 'retry-after': '3' } } },
+        TRANSIENT_RETRY_BASE_DELAY_MS,
+        now,
+      ),
+    ).toBe(3_000);
+    expect(
+      retryDelayMs(
+        { response: { headers: { 'Retry-After': 'Fri, 07 Aug 2026 12:00:05 GMT' } } },
+        TRANSIENT_RETRY_BASE_DELAY_MS,
+        now,
+      ),
+    ).toBe(5_000);
+    expect(
+      retryDelayMs(
+        { response: { headers: { 'Retry-After': '3600' } } },
+        TRANSIENT_RETRY_BASE_DELAY_MS,
+        now,
+      ),
+    ).toBe(MAX_RETRY_AFTER_DELAY_MS);
+  });
+
+  it('does not retry permanent API failures or unrelated programming errors', async () => {
+    const unauthorized = Object.assign(new Error('Unauthorized'), {
+      response: { status: 401 },
+    });
+    const unauthorizedRequest = vi.fn(async () => {
+      throw unauthorized;
+    });
+    const programmingError = new TypeError('Invalid local value');
+    const programmingRequest = vi.fn(async () => {
+      throw programmingError;
     });
     const sleep = vi.fn(async () => undefined);
 
-    await expect(retryOnRequestTimeout(request, sleep)).rejects.toBe(failure);
-    expect(request).toHaveBeenCalledTimes(1);
+    expect(isRetryableRequestError(unauthorized)).toBe(false);
+    expect(isRetryableRequestError(programmingError)).toBe(false);
+    await expect(retryTransientRequest(unauthorizedRequest, sleep)).rejects.toBe(unauthorized);
+    await expect(retryTransientRequest(programmingRequest, sleep)).rejects.toBe(programmingError);
+    expect(unauthorizedRequest).toHaveBeenCalledTimes(1);
+    expect(programmingRequest).toHaveBeenCalledTimes(1);
     expect(sleep).not.toHaveBeenCalled();
   });
 });

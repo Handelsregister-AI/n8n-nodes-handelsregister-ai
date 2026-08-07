@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const sourceRoots = ['nodes', 'credentials'];
+const sourceRoots = ['nodes', 'credentials', 'icons'];
 const exts = new Set(['.json', '.png', '.svg']);
 
 function copyDir(srcDir, dstDir) {

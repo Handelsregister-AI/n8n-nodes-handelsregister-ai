@@ -80,6 +80,34 @@ Supported structured filters:
 
 **Advanced Filters JSON** accepts a raw API filters object for forward compatibility. Explicit structured fields override matching keys in that object.
 
+### Signals
+
+Track normalized commercial-register changes through the stable Signals taxonomy.
+
+- **Get Signal Catalog** returns all seven public topics for free.
+- **Get Signal** returns one Signal by its stable event ID for 20 credits.
+- **List Signals** returns fixed pages of 20 Signals for 20 credits per page.
+- Filter by one or more topics, multiple organization entity IDs, and inclusive publication dates.
+- **Return All** follows opaque cursors automatically; **Maximum Results** adds an optional cap.
+- Without Return All, pass a previous `next_cursor` unchanged for manual pagination.
+- **Output** returns either one n8n item per Signal or the complete response with pagination,
+  filters, warnings, and billing metadata.
+
+Available topics:
+
+| Topic               | Description                                                           | Plan       |
+| ------------------- | --------------------------------------------------------------------- | ---------- |
+| NEW_REGISTRATIONS   | Newly registered organizations                                        | All plans  |
+| MASTER_DATA_CHANGES | Company name, seat, address, or registry changes                      | All plans  |
+| CLOSURES            | Dissolution, liquidation, deletion, or expiry                         | All plans  |
+| ROLE_HOLDER_CHANGES | Management, board, and procuration changes                            | All plans  |
+| CAPITAL_CHANGES     | Share, liable, nominal, or authorized capital changes                 | All plans  |
+| INSOLVENCIES        | Openings, protective measures, and completed proceedings              | Pro or Max |
+| TRANSFORMATIONS     | Mergers, divisions, conversions, transfers, and enterprise agreements | Max        |
+
+Requests below the required plan return a structured `PLAN_REQUIRED` error and consume no
+credits.
+
 ### Fetch Person
 
 Fetch a person by name and organization context. The endpoint requires an active Plus, Pro, or Max subscription and has a 15-credit base price.
@@ -124,12 +152,28 @@ Filter-only organization search:
   "returnAll": false,
   "searchOutput": "split",
   "additionalFields": {
-    "limit": 30,
+    "pageSize": 30,
     "postal_code": "80331",
     "legal_form_code": "GmbH, UG",
     "active": true,
     "pl_revenue_gte": 1000000
   }
+}
+```
+
+List Capital Changes and Transformations for multiple organizations, following cursors up to 50
+results:
+
+```json
+{
+  "operation": "listSignals",
+  "signalTopics": ["CAPITAL_CHANGES", "TRANSFORMATIONS"],
+  "signalOrganizationIds": "organization-id-one, organization-id-two",
+  "signalFrom": "2026-07-01",
+  "signalTo": "2026-07-30",
+  "signalsReturnAll": true,
+  "signalsMaxResults": 50,
+  "signalsOutput": "split"
 }
 ```
 
@@ -155,7 +199,12 @@ API failures use n8n's API-aware node errors. With **Continue On Fail**, the out
 
 Credentials and request headers are never included in error output.
 
-HTTP 408 Request Timeout responses are retried transparently up to three times with exponential backoff. Other HTTP failures are returned immediately.
+Read requests retry transient failures transparently up to three times. This includes common
+network errors, HTTP 408 and 429 responses, and server-side 5xx responses. The node honors the
+server's `Retry-After` header (capped at 60 seconds); otherwise it uses exponential backoff of one,
+two, and four seconds. Authentication, credit, plan, validation, conflict, and not-found errors are
+returned immediately. Retries are intentionally limited to GET requests so future write operations
+cannot be replayed accidentally.
 
 ## Development
 
@@ -165,11 +214,11 @@ npm run format:check
 npm run lint
 npm test
 npm run build
-npm audit
+npm run audit
 npm pack --dry-run
 ```
 
-The test suite covers request serialization, validation, search pagination, n8n item linking, authentication, documents, and structured errors. Docker end-to-end tests install the generated tarball into a clean n8n instance.
+The test suite covers request serialization, validation, search and Signals pagination, n8n item linking, authentication, documents, and structured errors. Docker end-to-end tests install the generated tarball into a clean n8n instance.
 
 To run the same end-to-end matrix locally:
 
@@ -180,7 +229,7 @@ HANDELSREGISTER_API_KEY_THROW_AWAY=your_test_key npm run docker:e2e:test
 npm run docker:e2e:down
 ```
 
-The stack binds only to `127.0.0.1:5678`. The live test reads only `HANDELSREGISTER_API_KEY_THROW_AWAY` and exercises the supported company, person, and document operations with API-key authentication. To test a different n8n release, set `N8N_VERSION` for the Docker Compose command.
+The stack binds only to `127.0.0.1:5678`. The live test reads only `HANDELSREGISTER_API_KEY_THROW_AWAY` and exercises the supported company, person, Signals, and document operations with API-key authentication. To test a different n8n release, set `N8N_VERSION` for the Docker Compose command.
 
 ## Documentation and support
 

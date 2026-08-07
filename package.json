@@ -1,6 +1,6 @@
 {
   "name": "@handelsregister/n8n-nodes-handelsregister-ai",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "n8n community node for Handelsregister.ai API integration",
   "keywords": [
     "n8n-community-node-package",
@@ -13,7 +13,7 @@
   "homepage": "https://github.com/Handelsregister-AI/n8n-nodes-handelsregister-ai",
   "author": {
     "name": "Handelsregister AI",
-    "email": "info@handelsregister.ai"
+    "email": "team@handelsregister.ai"
   },
   "repository": {
     "type": "git",
@@ -23,13 +23,14 @@
   "scripts": {
     "build": "tsc && node scripts/copy-assets.js && npm run lint",
     "dev": "tsc --watch",
-    "format": "prettier nodes credentials tests scripts .github/workflows README.md CHANGELOG.md package.json docker-compose.e2e.yml vitest.config.ts eslint.config.js tsconfig.json tsconfig.eslint.json --write",
-    "format:check": "prettier nodes credentials tests scripts .github/workflows README.md CHANGELOG.md package.json docker-compose.e2e.yml vitest.config.ts eslint.config.js tsconfig.json tsconfig.eslint.json --check",
-    "lint": "eslint \"nodes/**/*.ts\" \"credentials/**/*.ts\" \"scripts/**/*.js\"",
-    "lintfix": "eslint \"nodes/**/*.ts\" \"credentials/**/*.ts\" \"scripts/**/*.js\" --fix",
+    "format": "prettier nodes credentials icons tests scripts .github/workflows README.md CHANGELOG.md package.json docker-compose.e2e.yml vitest.config.ts eslint.config.mjs tsconfig.json tsconfig.eslint.json --write",
+    "format:check": "prettier nodes credentials icons tests scripts .github/workflows README.md CHANGELOG.md package.json docker-compose.e2e.yml vitest.config.ts eslint.config.mjs tsconfig.json tsconfig.eslint.json --check",
+    "lint": "n8n-node lint",
+    "lintfix": "n8n-node lint --fix",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "audit": "npm audit --omit=dev",
     "pack:e2e": "node scripts/prepare-e2e.js",
     "docker:e2e:up": "docker compose -f docker-compose.e2e.yml up --build --detach",
     "docker:e2e:down": "docker compose -f docker-compose.e2e.yml down --volumes --remove-orphans",
@@ -45,6 +46,7 @@
   },
   "n8n": {
     "n8nNodesApiVersion": 1,
+    "strict": true,
     "credentials": [
       "dist/credentials/HandelsregisterAiApi.credentials.js"
     ],
@@ -53,20 +55,18 @@
     ]
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@n8n/node-cli": "^0.42.1",
     "@types/node": "^22.20.1",
     "@vitest/coverage-v8": "^4.1.10",
-    "eslint": "^10.8.0",
-    "globals": "^16.5.0",
+    "eslint": "9.32.0",
     "n8n-workflow": "2.31.3",
     "prettier": "^3.9.6",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.65.0",
     "vitest": "^4.1.10"
   },
   "dependencies": {},
   "peerDependencies": {
-    "n8n-workflow": ">=1.82.0 <2 || >=2.31.3 <3"
+    "n8n-workflow": "*"
   },
   "packageManager": "npm@11.11.0"
 }

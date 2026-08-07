@@ -13,6 +13,13 @@ async function authenticate(
 }
 
 describe('HandelsregisterAi credentials', () => {
+  it('uses themed SVG icons required for community-node review', () => {
+    expect(new HandelsregisterAiApi().icon).toEqual({
+      light: 'file:../icons/handelsregister_ai.svg',
+      dark: 'file:../icons/handelsregister_ai.dark.svg',
+    });
+  });
+
   it('preserves existing API-key credentials when the method field is absent', async () => {
     const request = await authenticate(
       { apiKey: 'api-test' },

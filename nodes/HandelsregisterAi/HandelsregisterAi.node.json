@@ -1,5 +1,5 @@
 {
-  "node": "n8n-nodes-base.handelsregisterAi",
+  "node": "@handelsregister/n8n-nodes-handelsregister-ai.handelsregisterAi",
   "nodeVersion": "1.0",
   "codexVersion": "1.0",
   "categories": ["Data & Storage"],
@@ -15,5 +15,5 @@
       }
     ]
   },
-  "alias": ["German Business Registry", "Handelsregister", "Company Search"]
+  "alias": ["German Business Registry", "Handelsregister", "Company Search", "Company Signals"]
 }

@@ -1,13 +1,18 @@
-import {
+import type {
   IAuthenticate,
   ICredentialType,
   INodeProperties,
   ICredentialTestRequest,
+  Icon,
 } from 'n8n-workflow';
 
 export class HandelsregisterAiApi implements ICredentialType {
   name = 'handelsregisterAiApi';
   displayName = 'Handelsregister.ai API';
+  icon: Icon = {
+    light: 'file:../icons/handelsregister_ai.svg',
+    dark: 'file:../icons/handelsregister_ai.dark.svg',
+  };
   documentationUrl = 'https://handelsregister.ai/documentation';
   properties: INodeProperties[] = [
     {

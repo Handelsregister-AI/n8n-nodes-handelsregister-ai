@@ -218,7 +218,7 @@ function main() {
     searchAiMode: false,
     returnAll: false,
     searchOutput: 'response',
-    additionalFields: { limit: 2 },
+    additionalFields: { pageSize: 2 },
   });
   const searchItems = outputItems(searchExecution);
   const search = searchItems[0]?.json;
@@ -228,6 +228,127 @@ function main() {
   assert(search.results[0]?.entity_id, 'Search result is missing entity_id');
   const organizationId = search.results[0].entity_id;
 
+  const signalCatalog = firstJson(
+    executeWorkflow('E2E Signal catalog', {
+      operation: 'getSignalCatalog',
+    }),
+  );
+  assert(Array.isArray(signalCatalog.topics), 'Signal catalog is missing topics');
+  assert(signalCatalog.topics.length === 7, 'Signal catalog did not return all seven topics');
+  assert(
+    signalCatalog.topics.some((topic) => topic?.code === 'INSOLVENCIES'),
+    'Signal catalog is missing INSOLVENCIES',
+  );
+  assert(
+    signalCatalog.topics.some((topic) => topic?.code === 'TRANSFORMATIONS'),
+    'Signal catalog is missing TRANSFORMATIONS',
+  );
+  assert(Number(signalCatalog.meta?.request_credit_cost) === 0, 'Signal catalog was not free');
+
+  const signalPage = firstJson(
+    executeWorkflow('E2E Signals first page', {
+      operation: 'listSignals',
+      signalTopics: [],
+      signalOrganizationIds: '',
+      signalFrom: '',
+      signalTo: '',
+      signalsReturnAll: false,
+      signalCursor: '',
+      signalsOutput: 'response',
+    }),
+  );
+  assert(Array.isArray(signalPage.signals), 'Signals response is missing signals');
+  assert(signalPage.signals.length === 20, 'Signals first page did not return 20 entries');
+  assert(signalPage.pagination?.has_more === true, 'Signals first page has no next page');
+  assert(signalPage.pagination?.next_cursor, 'Signals first page is missing next_cursor');
+  assert(
+    Number(signalPage.meta?.request_credit_cost) === 20,
+    'Signals first page did not report the expected credit cost',
+  );
+
+  const firstSignalId = signalPage.signals[0]?.event?.id;
+  assert(firstSignalId, 'Signals first page contains no event ID');
+  const signalDetailResponse = firstJson(
+    executeWorkflow('E2E Signal detail', {
+      operation: 'getSignal',
+      signalId: firstSignalId,
+    }),
+  );
+  const signalDetail = signalDetailResponse.signal ?? signalDetailResponse;
+  assert(signalDetail.event?.id === firstSignalId, 'Signal detail returned the wrong event');
+
+  const paginatedSignals = firstJson(
+    executeWorkflow('E2E Signals cursor pagination', {
+      operation: 'listSignals',
+      signalTopics: [],
+      signalOrganizationIds: '',
+      signalFrom: '',
+      signalTo: '',
+      signalsReturnAll: true,
+      signalsMaxResults: 21,
+      signalsOutput: 'response',
+    }),
+  );
+  assert(
+    paginatedSignals.signals?.length === 21,
+    'Signals Return All did not follow the cursor to a second page',
+  );
+  assert(
+    paginatedSignals.pagination?.pages_fetched === 2,
+    'Signals cursor pagination did not report two fetched pages',
+  );
+  assert(
+    Number(paginatedSignals.meta?.request_credit_cost) === 40,
+    'Signals cursor pagination did not aggregate page credit costs',
+  );
+
+  const entitledSignals = firstJson(
+    executeWorkflow('E2E entitled Signal topics', {
+      operation: 'listSignals',
+      signalTopics: ['INSOLVENCIES', 'TRANSFORMATIONS'],
+      signalOrganizationIds: '',
+      signalFrom: '',
+      signalTo: '',
+      signalsReturnAll: false,
+      signalCursor: '',
+      signalsOutput: 'response',
+    }),
+  );
+  assert(
+    entitledSignals.signals?.every((signal) =>
+      ['INSOLVENCIES', 'TRANSFORMATIONS'].includes(signal?.event?.topic),
+    ),
+    'Signals topic filtering returned a topic outside the requested Pro/Max set',
+  );
+
+  const signalOrganizationIds = [
+    ...new Set(
+      paginatedSignals.signals.map((signal) => signal?.organization?.entity_id).filter(Boolean),
+    ),
+  ].slice(0, 2);
+  assert(
+    signalOrganizationIds.length === 2,
+    'Could not obtain two organization IDs for the Signals filter test',
+  );
+  const organizationSignals = firstJson(
+    executeWorkflow('E2E multiple Signal organization IDs', {
+      operation: 'listSignals',
+      signalTopics: [],
+      signalOrganizationIds: signalOrganizationIds.join(','),
+      signalFrom: '',
+      signalTo: '',
+      signalsReturnAll: false,
+      signalCursor: '',
+      signalsOutput: 'response',
+    }),
+  );
+  assert(
+    organizationSignals.signals?.every((signal) =>
+      signalOrganizationIds.includes(signal?.organization?.entity_id),
+    ),
+    'Signals organization filtering returned an organization outside the requested set',
+  );
+
   const filterSearch = firstJson(
     executeWorkflow('E2E filter-only search', {
       operation: 'searchOrganizations',
@@ -235,7 +356,7 @@ function main() {
       searchAiMode: false,
       returnAll: false,
       searchOutput: 'response',
-      additionalFields: { city: 'München', active: true, limit: 1 },
+      additionalFields: { city: 'München', active: true, pageSize: 1 },
     }),
   );
   assert(filterSearch.results?.length === 1, 'Filter-only search did not return one result');
@@ -300,7 +421,7 @@ function main() {
       searchAiMode: false,
       returnAll: false,
       searchOutput: 'response',
-      additionalFields: { limit: 5 },
+      additionalFields: { pageSize: 5 },
     }),
   );
   const mergerOrganization = mergerSearch.results?.find((result) => result.name === 'Teltec AG');
@@ -386,6 +507,14 @@ function main() {
       },
       pagination: {
         resultCount: paginatedSearch.results.length,
+      },
+      signals: {
+        catalogTopics: signalCatalog.topics.length,
+        firstPageCount: signalPage.signals.length,
+        cursorResultCount: paginatedSignals.signals.length,
+        proAndMaxTopics: true,
+        multipleOrganizationIds: true,
+        detail: true,
       },
       organization: {
         representationScheme: true,

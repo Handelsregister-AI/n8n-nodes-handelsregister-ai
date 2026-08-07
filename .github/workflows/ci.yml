@@ -38,4 +38,4 @@ jobs:
         run: npm run build
 
       - name: Audit dependencies
-        run: npm audit
+        run: npm run audit
